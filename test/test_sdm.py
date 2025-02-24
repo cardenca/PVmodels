@@ -25,7 +25,7 @@ Vt = Boltzmann*Tc/elementary_charge
 # Calcule domain of positive paramters fitting cardinal points
 amax, rmin, region = one_dimensional_sdm_domain(imp, vmp)
 nmax = amax*Voc/Vt/Ns
-Amax = amax*Voc*0.99
+Amax = amax*Voc*0.8
 
 # calculate sd1 paramters (scaled)
 iph,io,a,rs,gsh = calculate_parameters_sd1(

@@ -61,7 +61,7 @@ def photovoltaic_current(
     Returns
     -------
     list
-        Calculated photovoltaic currents (A).
+        Calculated photovoltaic current (A).
     """
     # Convert Volt to a NumPy array for faster processing
     Volt = np.asarray(Volt, dtype=float)
