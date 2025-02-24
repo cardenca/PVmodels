@@ -400,7 +400,7 @@ __pycache__/
 
 .venv/*
 *.pdf
-*.pkl
+# *.pkl
 *.png
 *.xlsx
 *.csv
@@ -722,4 +722,4 @@ TSWLatexianTemp*
 exit
 exit.pub
 
-polar_optimization/TeX/._wordcount_selection.tex
+# polar_optimization/TeX/._wordcount_selection.tex

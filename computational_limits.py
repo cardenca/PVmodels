@@ -21,12 +21,12 @@ import pandas as pd
 # from lumped_models.null_resistive_losses_model import photovoltaic_current
 # from lumped_models.null_resistive_losses_model import photovoltaic_voltage
 # from lumped_models.null_resistive_losses_model import mpp_nrlm
-from lumped_models.null_resistive_losses_model import nrl_limit
-from lumped_models.null_shunt_conductance_model import maximum_power_point_ainf as mpp_nsh
-from lumped_models.null_series_resistance_model import maximum_power_point_ainf as mpp_nsr
+from lumped_model.null_resistive_losses_model import nrl_limit
+from lumped_model.null_shunt_conductance_model import maximum_power_point_ainf as mpp_nsh
+from lumped_model.null_series_resistance_model import maximum_power_point_ainf as mpp_nsr
 
 # from lumped_models.data.computational_constants import float_supremum_python
-from lumped_models.data.computational_constants import ainf
+# from lumped_model.data.computational_constants import ainf
 
 # Python maximum float
 # -----------------
@@ -37,6 +37,7 @@ from lumped_models.data.computational_constants import ainf
 
 # ainf_mods = 1/np.log(10)/302
 ninterpol = 1000
+ainf = 1/np.log(10)/302
 
 # print(float_supremum_python)
 
@@ -132,7 +133,7 @@ df = pd.DataFrame(
      'vmp_nsr':vmp_nsr_sort,'imp_nsr':imp_nsr_sort}
 )
 
-df.to_pickle(r'./package/data/computational_limits.pkl')
+df.to_pickle(r'./support_data/computational_limits.pkl')
 
 # insh_sup = interpolation_imp(vmp_test,imp_test,vmp_nsh_sort,imp_nsh_sort)
 # insr_sup = interpolation_imp(vmp_test,imp_test,vmp_nsr_sort,imp_nsr_sort)
