@@ -12,12 +12,9 @@ import sys
 
 from lambertW import lw_roberts
 
-# Computable limits input
+# Computable limits
 # -----------------
 
-# from lumped_models.data.computational_constants import ainf as ainf_system
-float_supremum_python = sys.float_info.max
-ainf_theo  = 1/np.log(float_supremum_python)
 ainf = 1/np.log(10)/302
 
 
@@ -34,7 +31,7 @@ def _photovoltaic_current_dfsd(ipv,vpv,iph,io,a,rs,gsh):
     return(-io * rs * t2 * t6 - rs * gsh - 1)
 
 def photovoltaic_current(
-        Volt: list, Iph: float, Io: float, A: float, Rs: float, Gsh: float, method='lm'
+        Volt: list, Iph: float, Io: float, A: float, Rs: float, Gsh: float, method='lw-roberts'
     ) -> list:
     """
     Calculate the photovoltaic current for given parameters.
@@ -117,21 +114,48 @@ def _photovoltaic_voltage_dfsd(vpv,ipv,iph,io,a,rs,gsh):
     return(-io * t1 * t6 - gsh)
 
 def photovoltaic_voltage(
-        ipv:list, iph:float, io:float, a:float, rs:float, gsh:float,method='lm'
+        Curr:list, Iph:float, Io:float, A:float, Rs:float, Gsh:float,method='lw-roberts'
     ):
+    """
+    Calculate the photovoltaic voltage for given parameters.
 
-    ipv = np.asarray(ipv, dtype=float)
+    Parameters
+    ----------
+    Volt : list
+        List of photovoltaic voltages (V).
+    Iph : float
+        Photo-generated current (A).
+    Io : float
+        Saturation current (A).
+    A : float
+        Equivalent factor of the diode (V).
+    Rs : float
+        Series resistance (Ohms).
+    Gsh : float
+        Shunt conductance (1/Ohms).
+    method : str, optional
+        Method to compute the photovoltaic current. Options are:
+        'lm' (Levenberg-Marquardt least-squares method) or 
+        'lw-roberts' (Lambert W approximation by Roberts). Default is 'lm'.
+
+    Returns
+    -------
+    list
+        Calculated photovoltaic voltage (V).
+    """
+
+    Curr = np.asarray(Curr, dtype=float)
 
     if method=='lm':
 
         vpv = []
-        for ipv_point in ipv:
+        for ipv_point in Curr:
             # Initial point estimation
-            if gsh > 0:
-                vpv0 = (iph+io-(rs*gsh+1)*ipv_point)/gsh
+            if Gsh > 0:
+                vpv0 = (Iph+Io-(Rs*Gsh+1)*ipv_point)/Gsh
             else: 
-                vpv0 = a*np.log(iph/io+1)
-            vpv1 = a*np.log((iph+io-(rs*gsh+1)*ipv_point)/io/np.exp(rs*ipv_point/a))
+                vpv0 = A*np.log(Iph/Io+1)
+            vpv1 = A*np.log((Iph+Io-(Rs*Gsh+1)*ipv_point)/Io/np.exp(Rs*ipv_point/A))
             if vpv0 > vpv1:
                 vpv0 = vpv1
             # Resolution of the system
@@ -139,7 +163,7 @@ def photovoltaic_voltage(
                 fun=_photovoltaic_voltage_fsd,
                 jac=_photovoltaic_voltage_dfsd,
                 x0=vpv0,
-                args=(ipv_point,iph,io,a,rs,gsh),
+                args=(ipv_point,Iph,Io,A,R,Gsh),
                 method='lm'
             )
             vpv.append( sol.x[0] )
@@ -147,20 +171,20 @@ def photovoltaic_voltage(
         return vpv
 
     if method=='lw-roberts':
-        t1 = 0.1e1 / a
-        t3 = 0.1e1 / gsh
-        t10 = lw_roberts( t3 * t1 * (io + iph - ipv) + np.log(t3 * t1 * io) )
-        return(t3 * (-a * gsh * t10 - gsh * ipv * rs + io + iph - ipv))
+        t1 = 0.1e1 / A
+        t3 = 0.1e1 / Gsh
+        t10 = lw_roberts( t3 * t1 * (Io + Iph - Curr) + np.log(t3 * t1 * Io) )
+        return(t3 * (-A * Gsh * t10 - Gsh * Curr * Rs + Io + Iph - Curr))
 
 # Single diode model maximum power point estimation
 # -----------------
 
-def total_derivative_current_voltage_sdm(vpv,ipv,iph,io,a,rs,gsh):
+def _total_derivative_current_voltage_sdm(vpv,ipv,iph,io,a,rs,gsh):
     t6 = np.exp((rs * ipv + vpv) / a)
     t8 = a * gsh
     return 0.1e1 / (io * rs * t6 + rs * t8 + a) * (-io * t6 - t8)
 
-def maximum_power_point_system_sdm(x,iph,io,a,rs,gsh):
+def _maximum_power_point_system_sdm(x,iph,io,a,rs,gsh):
     vmp,imp = x
     t2 = imp * rs
     t4 = 0.1e1 / a
@@ -170,7 +194,7 @@ def maximum_power_point_system_sdm(x,iph,io,a,rs,gsh):
     dfmp = t4 * (-t6 * (t2 - vmp) * io - (gsh * imp * rs + imp - t9) * a)
     return np.array([fmp, dfmp])
 
-def maximum_power_point_jacobian_sdm(x,iph,io,a,rs,gsh):
+def _maximum_power_point_jacobian_sdm(x,iph,io,a,rs,gsh):
     vmp,imp = x
     t2 = imp * rs
     t4 = 0.1e1 / a
@@ -185,7 +209,7 @@ def maximum_power_point_jacobian_sdm(x,iph,io,a,rs,gsh):
     A3 = t20 * (-t6 * (t2 + a - vmp) * t10 - (rs * gsh + 1) * t17)
     return np.array([[A0,A1],[A2,A3]])
 
-def maximum_power_point_sdm(iph: float,io: float,a: float,rs: float,gsh: float,isc: float,voc: float) -> tuple:
+def maximum_power_point_sdm(Iph: float,Io: float,A: float,Rs: float,Gsh: float,Isc: float,Voc: float) -> tuple:
     '''
     Parameters
     --------
@@ -213,18 +237,18 @@ def maximum_power_point_sdm(iph: float,io: float,a: float,rs: float,gsh: float,i
     '''
 
     # estimation of the initial point based on derivatives
-    msc = total_derivative_current_voltage_sdm(0,isc,iph,io,a,rs,gsh)
-    moc = total_derivative_current_voltage_sdm(voc,0,iph,io,a,rs,gsh)
+    msc = _total_derivative_current_voltage_sdm(0,Isc,Iph,Io,A,Rs,Gsh)
+    moc = _total_derivative_current_voltage_sdm(Voc,0,Iph,Io,A,Rs,Gsh)
 
-    vmp0 = (voc*moc+isc)/(moc-msc)
-    imp0 = msc*vmp0+isc
+    vmp0 = (Voc*moc+Isc)/(moc-msc)
+    imp0 = msc*vmp0+Isc
 
     # system resolution
     sol = least_squares(
-        fun=maximum_power_point_system_sdm,
-        jac=maximum_power_point_jacobian_sdm,
+        fun=_maximum_power_point_system_sdm,
+        jac=_maximum_power_point_jacobian_sdm,
         x0=(vmp0,imp0),
-        args=(iph,io,a,rs,gsh),
+        args=(Iph,Io,A,Rs,Gsh),
         method='lm'
     )
 
@@ -233,13 +257,13 @@ def maximum_power_point_sdm(iph: float,io: float,a: float,rs: float,gsh: float,i
 # Reduced representations
 # ---------------
 
-computational_limits = pd.read_pickle(r'./computational_limits.pkl')
+computational_limits = pd.read_pickle(r'./models/computational_limits.pkl')
 vmp_nrl_limit, imp_nrl_limit = computational_limits['vmp_nrl'], computational_limits['imp_nrl']
 vmp_nsh_limit, imp_nsh_limit = computational_limits['vmp_nsh'], computational_limits['imp_nsh']
 vmp_nsr_limit, imp_nsr_limit = computational_limits['vmp_nsr'], computational_limits['imp_nsr']
 
-vmp_inf = max( min(vmp_nsh_limit), min(vmp_nsr_limit), min(vmp_nrl_limit) )
-vmp_sup = min( max(vmp_nsh_limit), max(vmp_nsr_limit), max(vmp_nrl_limit) )
+vmp_inf = max( min(vmp_nsh_limit), min(vmp_nsr_limit), min(vmp_nrl_limit) ) #infimum computable voltage
+vmp_sup = min( max(vmp_nsh_limit), max(vmp_nsr_limit), max(vmp_nrl_limit) ) #supremum computable voltage
 
 # Three parameters representation
 #* Don't forget that to ensure positives values of iph and io: \
@@ -247,105 +271,111 @@ vmp_sup = min( max(vmp_nsh_limit), max(vmp_nsr_limit), max(vmp_nrl_limit) )
 #* gsh \in ]0, isc/(voc-rs*isc) [
 # -----------------
 
-def affine_transformation_sd3(a,rs,gsh,isc,voc):
+def affine_transformation_sd3(A:float,Rs:float,Gsh:float,Isc:float,Voc:float)->tuple:
     '''
-    Returns:
-        iph: dark saturatino current of the diode
-        io: 
+    Parameters
+    -----------
+        A   : float
+            Equivalent factor of the diode
+        Rs  : float
+            Series resistance
+        Gsh : float
+            Shunt conductance
+        Isc : float
+            Short-circuit current
+        Voc : float
+            Open-circuit voltage
+        
+    Return
+    -----------
+        Iph : float
+            Photo-generated current
+        Io  : float
+            Dark saturation current of the diode
     '''
-    t3 = isc * rs
-    t4 = 0.1e1 / a
+
+    t3 = Isc * Rs
+    t4 = 0.1e1 / A
     t6 = np.exp(t4 * t3)
-    t12 = np.exp(t4 * voc)
-    t14 = -t3 + voc
+    t12 = np.exp(t4 * Voc)
+    t14 = -t3 + Voc
     t18 = 0.1e1 / (-t6 + t12)
-    iph = t18 * (-t6 * voc * gsh + t12 * (gsh * rs + 1) * isc + gsh * t14 - isc)
-    io = t18 * (-gsh * t14 + isc)
-    return iph, io
+    Iph = t18 * (-t6 * Voc * Gsh + t12 * (Gsh * Rs + 1) * Isc + Gsh * t14 - Isc)
+    Io = t18 * (-Gsh * t14 + Isc)
+
+    return Iph, Io
 
 # Three parameters representation
 # -----------------
 
-def affine_transformation_sd2(a,rs,isc,voc,imp,vmp):
+def affine_transformation_sd2(A: float,Rs: float,Isc: float,Vmp: float,Imp: float,Voc: float)->tuple:
+    
     '''
-    Inputs:
-        a:
-        rs:
-        isc:
-        voc:
-        imp:
-        vmp
-    Outputs:
-        iph:
-        io:
-        gsh
+    Parameters
+    -----------
+        A   : float
+            Equivalent factor of the diode
+        Rs  : float
+            Series resistance
+        Isc : float
+            Short-circuit current
+        Vmp : float
+            Maximum power voltage
+        Imp : float
+            Maximum power current
+        Voc : float
+            Open-circuit voltage
+        
+    Return
+    -----------
+        Iph : float
+            Photo-generated current
+        Io  : float
+            Dark saturation current of the diode
+        Gsh : float
+            Shunt conductance
     '''
-    t2 = imp * rs
-    t4 = 0.1e1 / a
-    t6 = np.exp(t4 * (t2 + vmp))
-    t7 = isc * t6
-    t9 = isc * rs
+
+
+    t2 = Imp * Rs
+    t4 = 0.1e1 / A
+    t6 = np.exp(t4 * (t2 + Vmp))
+    t7 = Isc * t6
+    t9 = Isc * Rs
     t11 = np.exp(t4 * t9)
-    t12 = imp * t11
-    t15 = np.exp(t4 * voc)
-    t18 = -vmp + voc
-    t20 = imp * voc
-    t29 = 0.1e1 / (t6 * (t9 - voc) + t11 * (-t2 - vmp + voc) + (t2 - t9 + vmp) * t15)
-    iph = t29 * (isc * t15 * vmp + isc * t18 + t12 * voc - t7 * voc - t20)
-    io = t29 * (-isc * t18 + t20)
-    gsh = t29 * (-t7 + t12 - (imp - isc) * t15)
-    return iph, io, gsh
+    t12 = Imp * t11
+    t15 = np.exp(t4 * Voc)
+    t18 = -Vmp + Voc
+    t20 = Imp * Voc
+    t29 = 0.1e1 / (t6 * (t9 - Voc) + t11 * (-t2 - Vmp + Voc) + (t2 - t9 + Vmp) * t15)
+    Iph = t29 * (Isc * t15 * Vmp + Isc * t18 + t12 * Voc - t7 * Voc - t20)
+    Io = t29 * (-Isc * t18 + t20)
+    Gsh = t29 * (-t7 + t12 - (Imp - Isc) * t15)
 
-# nsh as a function of u and rs (partial derivatives included)
-# this function is expresed in terms of u=np.exp(1/a)
+    return Iph, Io, Gsh
 
-def shunt_conductance_numerator_nsh_a(a,imp,vmp):
-    t1 = 0.1e1 / a
-    t3 = np.exp(t1 * vmp)
-    t4 = np.exp(t1)
-    return(-t3 + imp - (imp - 1) * t4)
-
-def partial_shunt_conductance_numerator_dnsh_da(a,imp,vmp):
-    t1 = 0.1e1 / a
-    t3 = np.exp(t1 * vmp)
-    t5 = np.exp(t1)
-    t9 = a ** 2
-    return(0.1e1 / t9 * (t3 * vmp + (imp - 1) * t5))
-
-def shunt_conductance_numerator_nsh_rs(rs,u,imp,vmp):
+def _shunt_conductance_numerator_nsh_rs(rs,u,imp,vmp):
     t3 = u ** (imp * rs + vmp)
     t4 = u ** rs
     return(-t3 + imp * t4 + (-imp + 1) * u)
 
-def partial_shunt_conductance_numerator_dnsh_drs(rs,u,imp,vmp):
+def _partial_shunt_conductance_numerator_dnsh_drs(rs,u,imp,vmp):
     t3 = u ** (imp * rs + vmp)
     t5 = np.log(u)
     t7 = u ** rs
     return(-imp * t3 * t5 + imp * t5 * t7)
 
-def maximum_equivalent_factor_diode_ash_max(imp,vmp):
-    # Initial point
-    amax0 = (vmp-1)/np.log(1-imp)
-    sol = least_squares(
-        fun=shunt_conductance_numerator_nsh_a,
-        jac=partial_shunt_conductance_numerator_dnsh_da,
-        x0=amax0,
-        args=(imp,vmp),
-        method='lm'
-    )
-    return sol.x[0]
-
 # Maximum power point function as a function of u and rs (partial derivatives included)
 # this function is expresed in terms of u=np.exp(1/a)
 
-def maximum_power_point_function_fmp_rs(rs,u,imp,vmp):
+def _maximum_power_point_function_fmp_rs(rs,u,imp,vmp):
     t2 = imp * rs
     t5 = np.log(u)
     t9 = u ** (t2 + vmp)
     t14 = u ** rs
     return(t9 * (-t5 * (t2 - vmp) * (imp + vmp - 1) + imp - vmp) + t14 * (2 * vmp - 1) * imp - 2 * (imp - 0.1e1 / 0.2e1) * u * vmp)
 
-def partial_maximum_power_point_function_dfmp_drs(rs,u,imp,vmp):
+def _partial_maximum_power_point_function_dfmp_drs(rs,u,imp,vmp):
     t1 = imp + vmp - 1
     t3 = np.log(u)
     t4 = imp * rs
@@ -353,18 +383,18 @@ def partial_maximum_power_point_function_dfmp_drs(rs,u,imp,vmp):
     t19 = u ** rs
     return(-t6 * t3 * imp * t1 + t3 * imp * t6 * (-t3 * (t4 - vmp) * t1 + imp - vmp) + t3 * t19 * imp * (2 * vmp - 1))
 
-def maximum_power_point_function_zerors_fmp_u(u,imp,vmp):
+def _maximum_power_point_function_zerors_fmp_u(u,imp,vmp):
     t3 = np.log(u)
     t6 = u ** vmp
     return(t6 * (t3 * vmp * (imp + vmp - 1) + imp - vmp) + ((-2 * u + 2) * imp + u) * vmp - imp)
 
-def partial_maximum_power_point_function_zerors_dfmp_du(u,imp,vmp):
+def _partial_maximum_power_point_function_zerors_dfmp_du(u,imp,vmp):
     t3 = np.log(u)
     t5 = 2 * imp
     t8 = u ** (vmp - 1)
     return(vmp * (t8 * (t3 * vmp * (imp + vmp - 1) + t5 - 1) - t5 + 1))
 
-def equation_system_sd2_region(x,imp,vmp):
+def _equation_system_sd2_region(x,imp,vmp):
     u, rs = x
     t2 = imp * rs
     t4 = u ** (t2 + vmp)
@@ -374,7 +404,7 @@ def equation_system_sd2_region(x,imp,vmp):
     A1 = t4 * (-t12 * (t2 - vmp) * (imp + vmp - 1) + imp - vmp) + t5 * (2 * vmp - 1) * imp - 2 * u * vmp * (imp - 0.1e1 / 0.2e1)
     return A0, A1
 
-def jacobian_equation_system_sd2_region(x,imp,vmp):
+def _jacobian_equation_system_sd2_region(x,imp,vmp):
     u, rs = x
     t2 = imp * rs
     t3 = -t2 - vmp
@@ -397,7 +427,7 @@ def jacobian_equation_system_sd2_region(x,imp,vmp):
 # Pre-loaded data regarding the computable limits
 # The file used to compute the limits is under the name of "test/computational_limits.py"
 
-def interpolation_imp(vmp,vmp_region,imp_region):
+def _interpolation_imp(vmp,vmp_region,imp_region):
     ndat = sum(vmp_region<vmp)
     v1, v2 = vmp_region[ndat-1], vmp_region[ndat]
     i1, i2 = imp_region[ndat-1], imp_region[ndat]
@@ -407,67 +437,69 @@ def interpolation_imp(vmp,vmp_region,imp_region):
 
 # Main function to compute the boundaries of the sdm given imp, vmp
 
-def one_dimensional_sdm_domain(imp: float,vmp: float, ainf: float = ainf) -> tuple:
+def calculate_domain_sd1(Isc:float, Vmp: float, Imp: float, Voc: float) -> tuple:
     '''
     Parameters
     ------
-    imp : float
-        Scaled maximum power current
-    vmp : float
-        Scaled maximum power voltage
-    ainf : float, optional
-        Minimim (infimum) float supported by python such that ``exp(1/a)`` is finite.
+    Isc : float
+        Short-circuit current
+    Vmp : float
+        Maximum power voltage
+    Imp : float
+        Maximum power current
+    Voc : float, optional
+        Open-circuit voltage
 
     Returns
     ------
-    amax : float
-        Maximum limit for the scaled equivalent factor of the diode
-    rsmin : float
-        Minimum limit for the scaled series resistance 
+    Amax : float
+        Maximum limit for the equivalent factor of the diode
+    Rsmin : float
+        Minimum limit for the series resistance 
     region : str
-        Indicates the region of the data. The possibles values are 'nsr region', 'nsh region', or 'nan'.
+        Indicates the region of the data. The possibles values are 'nsr region' or 'nsh region'.
     '''
+
+    # scaling values
+    vmp, imp = Vmp/Voc, Imp/Isc
 
     # Checking the computable voltages
     if (vmp<=vmp_inf) + (vmp>=vmp_sup):
-        # print('region nan')
-        return np.nan, np.nan, np.nan
+        raise 'Error: voltage point outside computable limits (Vmp>Voc or Vmp<Voc/2)'
 
     # Checking the computable currents
-    imp_nsh = interpolation_imp(vmp,vmp_nsh_limit,imp_nsh_limit)
-    imp_nsr = interpolation_imp(vmp,vmp_nsr_limit,imp_nsr_limit)
+    imp_nsh = _interpolation_imp(vmp,vmp_nsh_limit,imp_nsh_limit)
+    imp_nsr = _interpolation_imp(vmp,vmp_nsr_limit,imp_nsr_limit)
 
     if (imp_nsh<imp) + (imp<imp_nsr):
-        # print('region nan')
-        return np.nan, np.nan, np.nan
+        raise 'Error: current point outside computable limits (Imp>Isc or Imp<Isc/2)'
     
     # Classifying the region
-    imp_nrl = interpolation_imp(vmp,vmp_nrl_limit,imp_nrl_limit)
-    # ainf = 1/np.log(10)/302
+    imp_nrl = _interpolation_imp(vmp,vmp_nrl_limit,imp_nrl_limit)
 
     try:
     
         if imp<=imp_nrl:
             region = 'nsr region'
 
-            # Looking for a good initial point
+            # TODO: Look for a good initial point
             # I realized that a good point is that one such that fmp(rs=0) < 0
 
             a0 = (vmp-1)/np.log(1-imp)
             u0 = np.exp(1/a0)
-            f0 = maximum_power_point_function_zerors_fmp_u(u0,imp,vmp)
+            f0 = _maximum_power_point_function_zerors_fmp_u(u0,imp,vmp)
 
             while f0>0:
                 a0 = (ainf+a0)/2
                 u0 = np.exp(1/a0)
-                f0 = maximum_power_point_function_zerors_fmp_u(u0,imp,vmp)
+                f0 = _maximum_power_point_function_zerors_fmp_u(u0,imp,vmp)
 
             #* Equation solution
 
             umin = least_squares( 
-                fun = maximum_power_point_function_zerors_fmp_u, 
+                fun = _maximum_power_point_function_zerors_fmp_u, 
                 x0 = u0, 
-                jac = partial_maximum_power_point_function_zerors_dfmp_du, 
+                jac = _partial_maximum_power_point_function_zerors_dfmp_du, 
                 args = (imp,vmp), 
                 method = 'lm'
                 ).x[0] 
@@ -475,16 +507,15 @@ def one_dimensional_sdm_domain(imp: float,vmp: float, ainf: float = ainf) -> tup
             amax = 1/np.log(umin)
             rsmin = 0
 
-            return amax, rsmin, region
+            return Voc*amax, Voc*rsmin/Isc, region
         
         else:
             region = 'nsh region'
 
-            # function rsmax*(1-a/amax0)
             rsmax = (1-vmp)/imp
             amax0 = (vmp-1)/np.log(1-imp)
 
-            # Looking for a good initial point
+            # TODO: Look for a good initial point
             # I realized that a good point is that one such that Rs_sh>Rs_mp
             # I'm sure there is a good mathmetical explanation for that
             # The issue with this solution is that is making the whole solution slower
@@ -493,15 +524,15 @@ def one_dimensional_sdm_domain(imp: float,vmp: float, ainf: float = ainf) -> tup
             u0 = np.exp(1/a0)
             r0 = rsmax*(1-a0/amax0)
 
-            rsh0 = least_squares( fun = shunt_conductance_numerator_nsh_rs, 
+            rsh0 = least_squares( fun = _shunt_conductance_numerator_nsh_rs, 
                                     x0 = r0, 
-                                    jac = partial_shunt_conductance_numerator_dnsh_drs, 
+                                    jac = _partial_shunt_conductance_numerator_dnsh_drs, 
                                     args = (u0,imp,vmp), 
                                     method = 'lm' ).x[0]
 
-            rmp0 = least_squares( fun = maximum_power_point_function_fmp_rs, 
+            rmp0 = least_squares( fun = _maximum_power_point_function_fmp_rs, 
                                     x0 = r0, 
-                                    jac = partial_maximum_power_point_function_dfmp_drs, 
+                                    jac = _partial_maximum_power_point_function_dfmp_drs, 
                                     args = (u0,imp,vmp), 
                                     method = 'lm' ).x[0]
 
@@ -511,147 +542,78 @@ def one_dimensional_sdm_domain(imp: float,vmp: float, ainf: float = ainf) -> tup
                 r0 = rsmax*(1-a0/amax0)
                 u0 = np.exp(1/a0)
 
-                rsh0 = least_squares( fun = shunt_conductance_numerator_nsh_rs, 
+                rsh0 = least_squares( fun = _shunt_conductance_numerator_nsh_rs, 
                                         x0 = r0, 
-                                        jac = partial_shunt_conductance_numerator_dnsh_drs, 
+                                        jac = _partial_shunt_conductance_numerator_dnsh_drs, 
                                         args = (u0,imp,vmp), 
                                         method = 'lm' ).x[0]
 
-                rmp0 = least_squares( fun = maximum_power_point_function_fmp_rs, 
+                rmp0 = least_squares( fun = _maximum_power_point_function_fmp_rs, 
                                         x0 = r0, 
-                                        jac = partial_maximum_power_point_function_dfmp_drs, 
+                                        jac = _partial_maximum_power_point_function_dfmp_drs, 
                                         args = (u0,imp,vmp), 
                                         method = 'lm' ).x[0]
                 
             r0 = rsh0
 
             sol = least_squares( 
-                fun = equation_system_sd2_region, 
+                fun = _equation_system_sd2_region, 
                 x0 = (u0,r0), 
-                jac = jacobian_equation_system_sd2_region, 
+                jac = _jacobian_equation_system_sd2_region, 
                 args = (imp,vmp), 
                 method = 'lm' )
             
             amax  = 1/np.log(sol.x[0])
             rsmin = sol.x[1]
 
-            return amax, rsmin, region
+            return Voc*amax, Voc*rsmin/Isc, region
         
     except:
-        return np.nan, np.nan, np.nan
+        raise 'Error: non computable value, possible problem with the initial point estimation, '+region
 
-def maximum_power_resistance_function(imp,vmp,asup=0,ainf=ainf,Npoints=250):
-
-    # if ainf == 'auto':
-    #     ainf = 1/300/np.log(10)
-
-    amax_mp, rsmin, region = one_dimensional_sdm_domain(imp,vmp)
-    ash = maximum_equivalent_factor_diode_ash_max(imp,vmp)
-
-    amax = ash
-    if asup > amax:
-        amax = asup
-     
-    a   = np.linspace(amax,ainf,Npoints)
-    u = np.exp(1/a)
-    rs = []
-    rs0 = rsmin 
-
-    for cont in range(Npoints):
-
-        sol = least_squares(
-                fun=maximum_power_point_function_fmp_rs,
-                jac=partial_maximum_power_point_function_dfmp_drs,
-                x0=rs0,
-                args=(u[cont],imp,vmp),
-                method='lm')
-
-        rs0 = sol.x[0]
-        rs.append(rs0)
-
-    rs = np.asarray(rs,dtype=float)
-
-    return a, rs
-
-def shunt_resistance_function(imp,vmp,ainf=ainf,Npoints=10):
-
-    # if ainf == 'auto':
-    #     ainf = 1/300/np.log(10)
-
-    amax = maximum_equivalent_factor_diode_ash_max(imp,vmp)
-
-    a = np.linspace(amax,ainf,Npoints)
-    u = np.exp(1/a)
-    rs0 = 0
-    rs = [ ] 
-
-    for cont in range(Npoints):
-
-        sol = least_squares(
-                fun= shunt_conductance_numerator_nsh_rs,
-                jac=partial_shunt_conductance_numerator_dnsh_drs,
-                x0=rs0,
-                args=(u[cont],imp,vmp),
-                method='lm' )
-
-        rs0 = sol.x[0]
-        rs.append(rs0) 
+def calculate_parameters_sd1(A: float, Isc:float, Vmp:float, Imp: float, Voc: float) -> tuple:
+    """
+    Parameters
+    --------
+    A   : float
+        Equivalent factor of the diode
+    Isc : float 
+        Short-circuit curent
+    Vmp : float
+        Maximum power voltage
+    Imp : float
+        Maximum power current
+    Voc : float
+        Open circuit voltage
     
-    rs = np.asarray(rs,dtype=float)
+    Return
+    --------
+    Iph : float
+        Photogenerated current
+    Io  : float
+        Dark saturation current of the diode
+    Rs  : float
+        Series resistance
+    Gsh : float
+        Shunt conductance
+    """
 
-    return a, rs
+    vmp, imp = Vmp/Voc, Imp/Isc
+    a = A/Voc
 
-def calculate_parameters_sd1(a: float,imp: float,vmp: float) -> tuple:
-
-    amp, rmp, region = one_dimensional_sdm_domain(imp,vmp)
+    amp, rmp, region = calculate_domain_sd1(1, vmp, imp, 1)
     rmax = (1-vmp)/imp
 
     u = np.exp(1/a)
     r0 = (rmp-rmax)*a/amp+rmax
 
     rs = least_squares(
-            fun=maximum_power_point_function_fmp_rs,
-            jac=partial_maximum_power_point_function_dfmp_drs,
+            fun=_maximum_power_point_function_fmp_rs,
+            jac=_partial_maximum_power_point_function_dfmp_drs,
             x0=r0,
             args=(u,imp,vmp),
             method='lm').x[0]
     
-    iph, io, gsh = affine_transformation_sd2(a,rs,1,1,imp,vmp)
+    iph, io, gsh = affine_transformation_sd2(a,rs,1,vmp,imp,1)
 
-    return iph,io,a,rs,gsh
-
-def fsd2_rs(a, imp, vmp):
-
-    amp, rmp, region = one_dimensional_sdm_domain(imp,vmp)
-    rmax = (1-vmp)/imp
-
-    u = np.exp(1/a)
-    r0 = (rmp-rmax)*a/amp+rmax
-
-    rs = least_squares(
-            fun=maximum_power_point_function_fmp_rs,
-            jac=partial_maximum_power_point_function_dfmp_drs,
-            x0=r0,
-            args=(u,imp,vmp),
-            method='lm').x[0]
-
-    return rs
-
-def fsd2_ipv(a, rs, vpv, imp, vmp):
-    t3 = 0.1e1 / a
-    t5 = np.exp(t3 * (imp * rs + vmp))
-    t6 = -vmp + 1
-    t8 = np.exp(t3 * rs)
-    t10 = np.exp(t3)
-    t12 = t10 * vmp + t6 * t8 - t5
-    t16 = vpv - 1
-    t20 = imp * t16
-    t34 = 0.1e1 / t12
-    # t36 = np.exp(t34 * t3 * (t5 * (rs * t16 - vpv) + t8 * (-rs * t20 + t6 * vpv) + t10 * ((vpv * imp + vmp - vpv) * rs + vpv * vmp)))
-    # t40 = scipy.special.lambertw(t34 * t3 * t36 * rs * (imp + vmp - 1))
-
-    t40 = lw_roberts(
-        t34 * t3 * (t5 * (rs * t16 - vpv) + t8 * (-rs * t20 + t6 * vpv) + t10 * ((vpv * imp + vmp - vpv) * rs + vpv * vmp)) + np.log(t34 * t3 * rs * (imp + vmp - 1))
-    )
-
-    return(t34 / rs * (-t40 * t12 * a + rs * (t5 * t16 - t8 * t20 + t10 * (vmp + (imp - 1) * vpv))))
+    return Isc*iph,Isc*io,Voc*rs/Isc,Isc*gsh/Voc
