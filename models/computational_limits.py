@@ -172,7 +172,7 @@ df = pd.DataFrame(
      'vmp_nsr':vmp_nsr_sort,'imp_nsr':imp_nsr_sort}
 )
 
-df.to_pickle(r'./models/computational_limits.pkl')
+df.to_csv(r'./models/computational_limits.csv')
 
 # insh_sup = interpolation_imp(vmp_test,imp_test,vmp_nsh_sort,imp_nsh_sort)
 # insr_sup = interpolation_imp(vmp_test,imp_test,vmp_nsr_sort,imp_nsr_sort)

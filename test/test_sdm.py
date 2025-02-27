@@ -19,8 +19,8 @@ from models.single_diode_model import affine_transformation_sd2
 from models.single_diode_model import affine_transformation_sd3
 
 # Cardinal points
-Isc, Voc = 9, 40
-Imp, Vmp = 8, 25
+Isc, Voc = 9.01, 52.46
+Imp, Vmp = 8.48, 42.99
 imp, vmp =  Imp/Isc, Vmp/Voc
 
 Tc = 25+273.15 # Cell temperature
@@ -29,12 +29,21 @@ Vt = Boltzmann*Tc/elementary_charge
 
 # Calcule domain of positive paramters fitting cardinal points
 Amax, Rsmin, region = calculate_domain_sd1(Isc, Vmp, Imp, Voc)
-# nmax = amax*Voc/Vt/Ns
-A_test = Amax*0.8
+# nmax = 1.5
+
+# print(
+#     Amax / Vt / Ns
+# )
+
+A_test = 1*Vt*Ns
 
 # calculate sd1 paramters (scaled)
 Iph_test,Io_test,Rs_test,Gsh_test = calculate_parameters_sd1(
     A_test, Isc, Vmp, Imp, Voc
+)
+
+print(
+    Iph_test,Io_test,Rs_test,Gsh_test
 )
 
 # calculate cardinal points from the model

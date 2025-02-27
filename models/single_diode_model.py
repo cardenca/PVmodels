@@ -257,7 +257,8 @@ def maximum_power_point(Iph: float,Io: float,A: float,Rs: float,Gsh: float,Isc: 
 # Reduced representations
 # ---------------
 
-computational_limits = pd.read_pickle(r'./models/computational_limits.pkl')
+computational_limits = pd.read_csv(r'./models/computational_limits.csv')
+
 vmp_nrl_limit, imp_nrl_limit = computational_limits['vmp_nrl'], computational_limits['imp_nrl']
 vmp_nsh_limit, imp_nsh_limit = computational_limits['vmp_nsh'], computational_limits['imp_nsh']
 vmp_nsr_limit, imp_nsr_limit = computational_limits['vmp_nsr'], computational_limits['imp_nsr']
