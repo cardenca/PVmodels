@@ -14,6 +14,7 @@ sys.path.append( os.getcwd() )
 import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
+from scipy.optimize import least_squares
 
 # Custom functions
 # -----------------
@@ -21,9 +22,47 @@ import pandas as pd
 # from lumped_models.null_resistive_losses_model import photovoltaic_current
 # from lumped_models.null_resistive_losses_model import photovoltaic_voltage
 # from lumped_models.null_resistive_losses_model import mpp_nrlm
-from models.null_resistive_losses_model import nrl_limit
+# from models.null_resistive_losses_model import nrl_limit
+
 from models.null_shunt_conductance_model import maximum_power_point_ainf as mpp_nsh
 from models.null_series_resistance_model import maximum_power_point_ainf as mpp_nsr
+
+# Null resistive losses model (NRLM)
+
+def _maximum_power_equation_system_nrl1(x,a):
+    vmp, imp = x
+    t3 = 0.1e1 / a
+    t4 = np.exp(t3)
+    t7 = np.exp(t3 * vmp)
+    A0 = t4 * (-imp + 1) - t7 + imp
+    A1 = t7 * vmp - (t4 - 1) * a * imp
+    return A0, A1
+
+def _jacobian_maximum_power_equation_system_nrl1(x,a):
+    vmp, imp = x
+    t2 = 0.1e1 / a
+    t4 = np.exp(t2 * vmp)
+    A0 = -t4 * t2
+    t6 = np.exp(t2)
+    A1 = 1 - t6
+    A2 = t2 * (a + vmp) * t4
+    A3 = A1 * a
+    return np.array([[A0,A1],[A2,A3]])
+
+def _nrl_limit(a,vmp0,imp0):
+            
+    sol = least_squares(
+        fun=_maximum_power_equation_system_nrl1,
+        x0=(vmp0,imp0),
+        jac=_jacobian_maximum_power_equation_system_nrl1,
+        method='lm',
+        args=[a],
+    )
+    
+    return sol.x[0], sol.x[1]
+
+# Null shunt conductance model
+
 
 # from lumped_models.data.computational_constants import float_supremum_python
 # from models.computational_constants import ainf
@@ -54,7 +93,7 @@ vmp_nrl, imp_nrl = [], []
 vmp0, imp0 = 1, 1
 
 for anrl in anrl_list:
-    vmp_sol, imp_sol = nrl_limit(anrl,vmp0,imp0)
+    vmp_sol, imp_sol = _nrl_limit(anrl,vmp0,imp0)
     vmp_nrl.append(vmp_sol)
     imp_nrl.append(imp_sol)
     vmp0, imp0 = vmp_sol, imp_sol

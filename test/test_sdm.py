@@ -10,7 +10,7 @@ from prettytable import PrettyTable
 # Custom functions
 from models.single_diode_model import photovoltaic_current
 from models.single_diode_model import photovoltaic_voltage
-from models.single_diode_model import maximum_power_point_sdm
+from models.single_diode_model import maximum_power_point
 
 from models.single_diode_model import calculate_parameters_sd1
 from models.single_diode_model import calculate_domain_sd1
@@ -19,7 +19,7 @@ from models.single_diode_model import affine_transformation_sd2
 from models.single_diode_model import affine_transformation_sd3
 
 # Cardinal points
-Isc, Voc = 10, 40
+Isc, Voc = 9, 40
 Imp, Vmp = 8, 25
 imp, vmp =  Imp/Isc, Vmp/Voc
 
@@ -44,8 +44,7 @@ Vpv_test = np.linspace( 0, Voc_test, 150 )
 Ipv_test = photovoltaic_current(Vpv_test, Iph_test, Io_test, A_test, Rs_test, Gsh_test)
 Isc_test = Ipv_test[0]
 
-Vmp_test, Imp_test = maximum_power_point_sdm(Iph_test, Io_test, A_test, Rs_test, Gsh_test, Isc_test, Voc_test)
-# Vmp_sd, Imp_sd = vmp_sd*Voc, imp_sd*Isc
+Vmp_test, Imp_test = maximum_power_point(Iph_test, Io_test, A_test, Rs_test, Gsh_test, Isc_test, Voc_test)
 
 table = PrettyTable()
 

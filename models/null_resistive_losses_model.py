@@ -17,24 +17,43 @@ def photovoltaic_current(Volt: list, Iph:float ,Io:float, A:float) -> list:
 
     Parameters
     ----------
-    Volt : list
+    Volt    : list
         List of photovoltaic voltages (V).
-    Iph : float
+    Iph     : float
         Photo-generated current (A).
-    Io : float
+    Io      : float
         Saturation current (A).
-    A : float
+    A       : float
         Equivalent factor of the diode (V).
 
-    Returns
+    Return
     -------
     list
         Calculated photovoltaic current (A).
     """
     return Iph-Io*(np.exp(Volt/A)-1)
 
-def photovoltaic_voltage(ipv,iph,io,a):
-    return a*np.log((iph+io-ipv)/io)
+def photovoltaic_voltage(Curr:float,Iph:float,Io:float,A:float) -> list:
+    """
+    Calculate the photovoltaic current for given parameters.
+
+    Parameters
+    ----------
+    Curr    : list
+        List of photovoltaic current (A)
+    Iph     : float
+        Photo-generated current (A)
+    Io      : float
+        Saturation current (A)
+    A       : float
+        Equivalent factor of the diode (V)
+
+    Return
+    -------
+    list
+        Calculated photovoltaic voltage (V)
+    """
+    return A*np.log((Iph+Io-Curr)/Io)
 
 def _maximum_power_equation_system(x,iph,io,a):
     vmp,imp = x
@@ -63,77 +82,72 @@ def _maximum_power_lambertW(iph,io,a):
     A1 = 0.1e1 / t7 * t3 * t8
     return A0, A1
 
-def maximum_power_point(iph,io,a,method='lm'):
+def maximum_power_point(Iph: float,Io: float,A:float,method: str = 'lm') -> tuple:
+    """
+    Parameters
+    ----------
+    Iph : float
+        Photogenerated current
+    Io  : float
+        Dark saturation current of the diode
+    A   : float
+        Equivalent factor of the diode
+    method  : string
+        Defines the method used for computing the maximum power point.
+        The options can be Levenverg-Marquardt 'lm', or LambertW 'lw'.
 
-    isc = photovoltaic_current(0,iph,io,a)
-    voc = photovoltaic_voltage(0,iph,io,a)
+    Return
+    ---------
+    Vmp : float
+        Maximum power voltage
+    Imp : float
+        Maximum power current
+    """
 
-    iph_scaled = iph/isc
-    io_scaled  = io/isc
-    a_scaled = a/voc
+    Isc = photovoltaic_current(0,Iph,Io,A)
+    Voc = photovoltaic_voltage(0,Iph,Io,A)
+
+    iph, io, a = Iph/Isc, Io/Isc, A/Voc # scaled parameters
 
     if method == 'lm':
         # Scaled initial point
-        t20  = np.exp(1/a_scaled)-1
-        vmp0_scaled = (io_scaled*np.exp(1/a_scaled)-a_scaled)/io_scaled/t20
-        imp0_scaled = np.exp(1/a_scaled)*(a_scaled-io_scaled)/a_scaled/t20
+        t20  = np.exp(1/a)-1
+        vmp0 = (io*np.exp(1/a)-a)/io/t20 
+        imp0 = np.exp(1/a)*(a-io)/a/t20
 
         sol = least_squares(
             fun=_maximum_power_equation_system,
-            x0=(vmp0_scaled,imp0_scaled),
+            x0=(vmp0,imp0),
             jac=_maximum_power_equation_jacobian,
             method='lm',
-            args=(iph_scaled,io_scaled,a_scaled)
+            args=(iph,io,a)
         )
             
-        return sol.x[0]*voc, sol.x[1]*isc, 
+        return sol.x[0]*Voc, sol.x[1]*Isc, 
 
     if method=='lw':
-        return _maximum_power_lambertW(iph,io,a)
+        return _maximum_power_lambertW(Iph,Io,A)
 
-def affine_transformations(a,isc,voc):
-    return isc, isc/(np.exp(voc/a)-1)
-
-def scaled_null_resistive_losses_model_voltage(imp):
-    t2 = 1 / (imp - 1)
-    t3 = t2 * imp
-    t4 = np.exp(t3)
-    t6 = lambertw(t4 * t3).real
-    t7 = 0.1e1 / t6
-    t10 = np.log(t2 * t7 * imp)
-    t14 = imp ** 2
-    t20 = np.log(1 / (t14 - 2 * imp + 1) * t7 * (imp * t6 - t6 - 1) * imp)
-    return(0.1e1 / t20 * t10)
-
-def _maximum_power_equation_system_nrl1(x,a):
-    vmp, imp = x
-    t3 = 0.1e1 / a
-    t4 = np.exp(t3)
-    t7 = np.exp(t3 * vmp)
-    A0 = t4 * (-imp + 1) - t7 + imp
-    A1 = t7 * vmp - (t4 - 1) * a * imp
-    return A0, A1
-
-def _jacobian_maximum_power_equation_system_nrl1(x,a):
-    vmp, imp = x
-    t2 = 0.1e1 / a
-    t4 = np.exp(t2 * vmp)
-    A0 = -t4 * t2
-    t6 = np.exp(t2)
-    A1 = 1 - t6
-    A2 = t2 * (a + vmp) * t4
-    A3 = A1 * a
-    return np.array([[A0,A1],[A2,A3]])
-
-def nrl_limit(a,vmp0,imp0):
-            
-    sol = least_squares(
-        fun=_maximum_power_equation_system_nrl1,
-        x0=(vmp0,imp0),
-        jac=_jacobian_maximum_power_equation_system_nrl1,
-        method='lm',
-        args=[a],
-    )
+def affine_transformation(A: float, Isc: float, Voc:float) -> tuple:
+    """
+    Parameters
+    -----------
+    A   : float
+        Equivalent factor of the diode
+    Isc : float
+        Short-circuit current
+    Voc : float
+        Open-circuit voltage
     
-    return sol.x[0], sol.x[1]
+    Return
+    -----------
+    Iph : float
+        Photogenerated current 
+    Io  : float
+        Dark saturation current of the diode
+
+    """
+    return Isc, Isc/(np.exp(Voc/A)-1)
+
+
 

@@ -179,12 +179,12 @@ def photovoltaic_voltage(
 # Single diode model maximum power point estimation
 # -----------------
 
-def _total_derivative_current_voltage_sdm(vpv,ipv,iph,io,a,rs,gsh):
+def _total_derivative_current_voltage(vpv,ipv,iph,io,a,rs,gsh):
     t6 = np.exp((rs * ipv + vpv) / a)
     t8 = a * gsh
     return 0.1e1 / (io * rs * t6 + rs * t8 + a) * (-io * t6 - t8)
 
-def _maximum_power_point_system_sdm(x,iph,io,a,rs,gsh):
+def _maximum_power_point_system(x,iph,io,a,rs,gsh):
     vmp,imp = x
     t2 = imp * rs
     t4 = 0.1e1 / a
@@ -194,7 +194,7 @@ def _maximum_power_point_system_sdm(x,iph,io,a,rs,gsh):
     dfmp = t4 * (-t6 * (t2 - vmp) * io - (gsh * imp * rs + imp - t9) * a)
     return np.array([fmp, dfmp])
 
-def _maximum_power_point_jacobian_sdm(x,iph,io,a,rs,gsh):
+def _maximum_power_point_jacobian(x,iph,io,a,rs,gsh):
     vmp,imp = x
     t2 = imp * rs
     t4 = 0.1e1 / a
@@ -209,7 +209,7 @@ def _maximum_power_point_jacobian_sdm(x,iph,io,a,rs,gsh):
     A3 = t20 * (-t6 * (t2 + a - vmp) * t10 - (rs * gsh + 1) * t17)
     return np.array([[A0,A1],[A2,A3]])
 
-def maximum_power_point_sdm(Iph: float,Io: float,A: float,Rs: float,Gsh: float,Isc: float,Voc: float) -> tuple:
+def maximum_power_point(Iph: float,Io: float,A: float,Rs: float,Gsh: float,Isc: float,Voc: float) -> tuple:
     '''
     Parameters
     --------
@@ -237,16 +237,16 @@ def maximum_power_point_sdm(Iph: float,Io: float,A: float,Rs: float,Gsh: float,I
     '''
 
     # estimation of the initial point based on derivatives
-    msc = _total_derivative_current_voltage_sdm(0,Isc,Iph,Io,A,Rs,Gsh)
-    moc = _total_derivative_current_voltage_sdm(Voc,0,Iph,Io,A,Rs,Gsh)
+    msc = _total_derivative_current_voltage(0,Isc,Iph,Io,A,Rs,Gsh)
+    moc = _total_derivative_current_voltage(Voc,0,Iph,Io,A,Rs,Gsh)
 
     vmp0 = (Voc*moc+Isc)/(moc-msc)
     imp0 = msc*vmp0+Isc
 
     # system resolution
     sol = least_squares(
-        fun=_maximum_power_point_system_sdm,
-        jac=_maximum_power_point_jacobian_sdm,
+        fun=_maximum_power_point_system,
+        jac=_maximum_power_point_jacobian,
         x0=(vmp0,imp0),
         args=(Iph,Io,A,Rs,Gsh),
         method='lm'
