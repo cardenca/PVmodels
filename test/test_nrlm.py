@@ -8,10 +8,10 @@ import numpy as np
 from prettytable import PrettyTable
 
 # Custom functions
-from models.null_resistive_losses_model import photovoltaic_current
-from models.null_resistive_losses_model import photovoltaic_voltage
-from models.null_resistive_losses_model import maximum_power_point
-from models.null_resistive_losses_model import affine_transformation
+from lumped_models.null_resistive_losses_model import photovoltaic_current
+from lumped_models.null_resistive_losses_model import photovoltaic_voltage
+from lumped_models.null_resistive_losses_model import maximum_power_point
+from lumped_models.null_resistive_losses_model import affine_transformation
 
 # Example 
 Isc, Voc = 1, 1

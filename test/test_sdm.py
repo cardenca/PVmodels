@@ -8,15 +8,15 @@ import numpy as np
 from prettytable import PrettyTable
 
 # Custom functions
-from models.single_diode_model import photovoltaic_current
-from models.single_diode_model import photovoltaic_voltage
-from models.single_diode_model import maximum_power_point
+from lumped_models.single_diode_model import photovoltaic_current
+from lumped_models.single_diode_model import photovoltaic_voltage
+from lumped_models.single_diode_model import maximum_power_point
 
-from models.single_diode_model import calculate_parameters_sd1
-from models.single_diode_model import calculate_domain_sd1
+from lumped_models.single_diode_model import calculate_parameters_sd1
+from lumped_models.single_diode_model import calculate_domain_sd1
 
-from models.single_diode_model import affine_transformation_sd2
-from models.single_diode_model import affine_transformation_sd3
+from lumped_models.single_diode_model import affine_transformation_sd2
+from lumped_models.single_diode_model import affine_transformation_sd3
 
 # Cardinal points
 Isc, Voc = 9.01, 52.46
@@ -34,16 +34,27 @@ Amax, Rsmin, region = calculate_domain_sd1(Isc, Vmp, Imp, Voc)
 # print(
 #     Amax / Vt / Ns
 # )
-
-A_test = 1*Vt*Ns
+n_test = 1
+A_test = n_test*Vt*Ns
 
 # calculate sd1 paramters (scaled)
 Iph_test,Io_test,Rs_test,Gsh_test = calculate_parameters_sd1(
     A_test, Isc, Vmp, Imp, Voc
 )
 
+
+table_parameters = PrettyTable()
+table_parameters.field_names = ["Parameter", "Value"]
+table_parameters.add_row(["Iph", Iph_test])
+table_parameters.add_row(["Io", Io_test])
+table_parameters.add_row(["A", A_test])
+table_parameters.add_row(["n", n_test])
+table_parameters.add_row(["Rs", Rs_test])
+table_parameters.add_row(["Rsh", 1/Gsh_test])
+table_parameters.add_row(["Gsh", Gsh_test])
+
 print(
-    Iph_test,Io_test,Rs_test,Gsh_test
+    table_parameters
 )
 
 # calculate cardinal points from the model

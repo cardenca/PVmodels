@@ -24,8 +24,8 @@ from scipy.optimize import least_squares
 # from lumped_models.null_resistive_losses_model import mpp_nrlm
 # from models.null_resistive_losses_model import nrl_limit
 
-from models.null_shunt_conductance_model import maximum_power_point_ainf as mpp_nsh
-from models.null_series_resistance_model import maximum_power_point_ainf as mpp_nsr
+from lumped_models.null_shunt_conductance_model import maximum_power_point_ainf as mpp_nsh
+from lumped_models.null_series_resistance_model import maximum_power_point_ainf as mpp_nsr
 
 # Null resistive losses model (NRLM)
 
